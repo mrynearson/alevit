@@ -1,0 +1,117 @@
+<?php
+// $Id: spritemenu.install,v 1.1.4.3 2009/07/28 16:10:33 hanoii Exp $
+
+/**
+ * @file
+ * .install code for the spritemenu module.
+ *
+ */
+
+/**
+ * Implementation of hook_schema().
+ */
+function spritemenu_schema() {
+  $schema['spritemenu'] = array(
+    'description' => t('Databasing storing menu item sprites.'),
+    'fields' => array(
+      'mid' => array(
+        'description' => t('{menu}.mid ID'),
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'path' => array(
+        'description' => t('TODO'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'filepath' => array(
+        'description' => t('TODO'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'link' => array(
+        'description' => t('TODO'),
+        'type' => 'varchar',
+        'length' => 100,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'visited' => array(
+        'description' => t('TODO'),
+        'type' => 'varchar',
+        'length' => 100,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'hover' => array(
+        'description' => t('TODO'),
+        'type' => 'varchar',
+        'length' => 100,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'active' => array(
+        'description' => t('TODO'),
+        'type' => 'varchar',
+        'length' => 100,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('mid'),
+  );
+
+  return $schema;
+}
+
+function spritemenu_install() {
+  // Create tables.
+  drupal_install_schema('spritemenu');
+}
+
+function spritemenu_uninstall() {
+  require_once('spritemenu.module');
+
+  // Delete all image files from disk
+  $result = db_query("SELECT * FROM {spritemenu}");
+  while ($row = db_fetch_object($result)) {
+    file_delete($row->filepath);
+  }
+
+  // remove css
+  $css = _spritemenu_css_filepath();
+  file_delete($css);
+
+  // Remove tables.
+  drupal_uninstall_schema('spritemenu');
+
+  // remove settings
+  variable_del('spritemenu_path');
+}
+
+/**
+ * Implementation of hook_requirements
+ */
+function spritemenu_requirements($phase) {
+  $requirements = array();
+  // Ensure translations don't break at install time
+  $t = get_t();
+
+  if ($phase == 'runtime') {
+    $cnt = db_result(db_query("SELECT COUNT(*) FROM {spritemenu} s LEFT JOIN {menu_links} ml ON s.mid = ml.mlid WHERE isnull(ml.mlid)"));
+    if ($cnt) {
+      $requirements['spritemenu_orphaned'] = array(
+        'title' => $t('Spritemenu orphaned items'),
+        'description' => $t("It is unclear why this sometimes happens. We are aware of this issue. In the meantime, however, we recommend to <a href=\"!clean_uri\">clean the orphaned items and rebuild the spritemenu CSS file</a>.<i></b></div>", array('!clean_uri' => url('spritemenu/clean_orphaned'))),
+        'severity' => REQUIREMENT_WARNING,
+        'value' => $cnt,
+      );
+   }
+ }
+
+ return $requirements;
+}

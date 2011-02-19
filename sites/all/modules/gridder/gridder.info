@@ -1,0 +1,10 @@
+; $Id: gridder.info,v 1.1 2009/06/25 01:49:36 himerus Exp $
+name = 960 Gridder
+description = Adds <a href="http://gridder.andreehansson.se/">960 Gridder</a> functionality to site by default for users with "use 960 gridder" permission enabled. It allows for custom settings to be configured via <a href="../settings/gridder">settings page</a>.
+core = 6.x
+; Information added by drupal.org packaging script on 2009-10-29
+version = "6.x-1.1"
+core = "6.x"
+project = "gridder"
+datestamp = "1256782536"
+

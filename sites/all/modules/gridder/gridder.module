@@ -1,0 +1,165 @@
+<?php
+// $Id: gridder.module,v 1.1.2.1 2009/10/29 02:12:50 himerus Exp $
+/**
+ * Implementation of hook_perm().
+ */
+function gridder_perm() {
+  return array('use 960 gridder', 'administer 960 gridder');
+}
+/**
+ * Implementation of hook_menu().
+ */
+function gridder_menu() {
+  $items = array();
+  $items['admin/settings/gridder'] = array(
+    'title' => t('960 Gridder Settings'),
+    'description' => t('Administer settings related to the 960 Gridder module.'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('gridder_admin_settings'),
+    'access arguments' => array('administer 960 gridder'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+/**
+ * Implementation of hook_init().
+ */
+function gridder_init() {
+  if ((user_access('use 960 gridder') && drupal_substr($_GET['q'], 0, 5) != 'admin') || (variable_get('gridder_admin_enable', false) && drupal_substr($_GET['q'], 0, 5) == 'admin')) {
+  	global $base_url;
+  	$path = drupal_get_path('module', 'gridder');
+  	$gridder_js = "
+  	var module_path = '" .$base_url ."/". $path ."';
+	  gOverride = {
+	    gColor: '".variable_get('gridder_vertical_color', '#EEEEEE')."',
+		  gColumns: " .variable_get('gridder_columns', 12). ",
+		  gOpacity: ".variable_get('gridder_vertical_opacity', 0.35).",
+		  gWidth: ".variable_get('gridder_vertical_gutter_width', 10).",
+		  pColor: '".variable_get('gridder_horizontal_color', '#C0C0C0')."',
+		  pHeight: ".variable_get('gridder_horizontal_lineheight', 15).",
+		  invert: " .variable_get('gridder_vertical_inverted', false). ",
+		  pOffset: ".variable_get('gridder_horizontal_offset', 0).",
+		  pOpacity: ".variable_get('gridder_horizontal_opacity', 0.55).",
+		  center: " .variable_get('gridder_vertical_centered', true). ",
+		  gEnabled: " .variable_get('gridder_vertical_enabled', true). ",
+		  pEnabled: " .variable_get('gridder_horizontal_enabled', false). ",
+		  setupEnabled: true,
+		  fixFlash: true,
+		  size: 960
+	  }
+	  createGridder = function() {
+	    document.body.appendChild(
+	      document.createElement('script'))
+	        .src='".$base_url ."/". $path . "/gridder.js';
+	  }
+	  $(document).ready(function(){
+	   createGridder();
+    });";
+    drupal_add_js($gridder_js, 'inline');
+    drupal_add_css($path .'/gridder.css', 'module', 'all', FALSE);
+  }
+}
+/*
+ * Admin Settings form for Save & Edit
+ */
+function gridder_admin_settings() {
+  $form['gridder_settings'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Gridder Default Configuration'),
+    '#description' => t('The default settings provided here will provide default settings when loading the <a href="http://gridder.andreehansson.se/">960 Gridder</a> for development purposes. You may always still change the settings using the flyout window on the left side of the page, but these will be easier to save your desired settings for a project.'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE
+  );
+  $form['gridder_settings']['gridder_admin_enable'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable Gridder for Admin Pages'),
+    '#description' => t('Select if 960 Gridder is enabled for administrative pages. Leaving this option unchecked will make administrative tasks easier.'),
+    '#default_value' => variable_get('gridder_admin_enable', false),
+  );
+  $form['gridder_settings']['gridder_vertical'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Vertical Gridder Configuration'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE
+  );
+  $form['gridder_settings']['gridder_vertical']['gridder_vertical_enabled'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable Vertical Gridder Columns'),
+    '#description' => t('Select if vertical grid columns should be enabled by default.'),
+    '#default_value' => variable_get('gridder_vertical_enabled', true),
+  );
+  $form['gridder_settings']['gridder_vertical']['gridder_vertical_centered'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Center Vertical Gridder Columns'),
+    '#description' => t('Select if vertical grid columns should be centered by default.'),
+    '#default_value' => variable_get('gridder_vertical_centered', true),
+  );
+  $form['gridder_settings']['gridder_vertical']['gridder_vertical_inverted'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Invert Vertical Gridder Columns'),
+    '#description' => t('Select if vertical grid columns should be inverted by default.'),
+    '#default_value' => variable_get('gridder_vertical_inverted', false),
+  );
+  $form['gridder_settings']['gridder_vertical']['gridder_vertical_color'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Define Vertical Grid Color'),
+    '#description' => t('Color value for the vertical columns. <strong>Use full #EEEEEE format.</strong>'),
+    '#default_value' => variable_get('gridder_vertical_color', '#EEEEEE'),
+  );
+  $form['gridder_settings']['gridder_vertical']['gridder_vertical_opacity'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Define Vertical Grid Opacity'),
+    '#description' => t('Default opacity for the vertical grid columns. <strong>Should be a decimal value between 0 and 1.</strong>'),
+    '#default_value' => variable_get('gridder_vertical_opacity', 0.35),
+  );
+  $form['gridder_settings']['gridder_vertical']['gridder_vertical_gutter_width'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Define Vertical Gutter Width'),
+    '#description' => t('Gutter width (In pixels). <strong>Should always be 10 unless you know what you are doing.</strong>'),
+    '#default_value' => variable_get('gridder_vertical_gutter_width', 10),
+  );
+  $form['gridder_settings']['gridder_vertical']['gridder_columns'] = array(
+    '#type' => 'select',
+    '#title' => t('Gridder Columns'),
+    '#description' => t('Select the amount of columns to render by default using 960 Gridder'),
+    '#options' => array('12' => '12', '16' => '16', '24' => '24'),
+    '#default_value' => variable_get('gridder_columns', 12),
+  );
+  $form['gridder_settings']['gridder_horizontal'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Horizontal Gridder Configuration'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE
+  );
+  $form['gridder_settings']['gridder_horizontal']['gridder_horizontal_enabled'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable Horizontal Gridder Rows'),
+    '#description' => t('Select if horizontal grid columns should be enabled by default.'),
+    '#default_value' => variable_get('gridder_horizontal_enabled', true),
+  );
+  $form['gridder_settings']['gridder_horizontal']['gridder_horizontal_color'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Define Horizontal Grid Color'),
+    '#description' => t('Color value for the horizontal rows. <strong>Use full #EEEEEE format.</strong>'),
+    '#default_value' => variable_get('gridder_horizontal_color', '#C0C0C0'),
+  );
+  $form['gridder_settings']['gridder_horizontal']['gridder_horizontal_opacity'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Define Horizontal Grid Opacity'),
+    '#description' => t('Default opacity for the horizontal grid rows. <strong>Should be a decimal value between 0 and 1.</strong>'),
+    '#default_value' => variable_get('gridder_horizontal_opacity', 0.55),
+  );
+  $form['gridder_settings']['gridder_horizontal']['gridder_horizontal_lineheight'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Define Horizontal Grid Line Height'),
+    '#description' => t('Default line height for the horizontal grid rows. <strong>Should be an integer value matching the default line height of your document.</strong>'),
+    '#default_value' => variable_get('gridder_horizontal_lineheight', 15),
+  );
+  $form['gridder_settings']['gridder_horizontal']['gridder_horizontal_offset'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Define Horizontal Grid Offset'),
+    '#description' => t('Default offset (in pixels) from the top of page.'),
+    '#default_value' => variable_get('gridder_horizontal_offset', 0),
+  );
+  return system_settings_form($form);
+}

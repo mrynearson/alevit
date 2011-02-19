@@ -1,0 +1,356 @@
+<?php
+// $Id: spritemenu.module,v 1.1.4.6 2009/07/29 19:52:22 hanoii Exp $
+
+/**
+ * @file
+ * Add an option to upload an image file for a menu, it can contains both normal
+ * (top, left) and hover, (bottom, left).
+ *
+ */
+
+define('SPRITEMENU_DEFAULT_EXTRACSS', 'ul.primary-links li');
+
+function _spritemenu_css_path() {
+  $directory = file_directory_path() .'/'. variable_get('spritemenu_path', 'spritemenu');
+  file_check_directory($directory, FILE_CREATE_DIRECTORY);
+  return $directory;
+
+}
+
+function _spritemenu_css_filepath() {
+  return file_create_path(_spritemenu_css_path() .'/spritemenu.css');
+}
+
+function _spritemenu_build_css() {
+  $extraselector = variable_get('spritemenu_extraselector', SPRITEMENU_DEFAULT_EXTRACSS);
+  if ($extraselector) {
+    $extraselector = split(',', $extraselector);
+  }
+  $selectors[] = '';
+  if (is_array($extraselector)) {
+    $selectors = array_merge($extraselector, $selectors);
+  }
+  
+  $css = _spritemenu_css_filepath();
+  $result = db_query("SELECT * FROM {spritemenu}");
+
+  while ($spritemenu = db_fetch_object($result)) {
+    if (!$f) {
+      $f = fopen($css, 'w+');
+    }
+
+    $img = basename($spritemenu->filepath);
+    $css = '';
+
+    // Link
+    $position_link = $spritemenu->link;
+    $css_selectors = array();
+    foreach ($selectors as $selector) {
+      if ($selector) {
+        $selector .= ' ';
+      }
+      $css_selectors[] = "{$selector}a.spritemenu-{$spritemenu->mid},\n{$selector}a.spritemenu-{$spritemenu->mid}:link";
+    }
+    $css .= implode($css_selectors, ",\n") . " {\n  text-indent: -9999px; \n  text-decoration: none; \n  width: 100%; \n  background: transparent url($img) no-repeat scroll $position_link;\n}\n";
+
+    // Visited
+    $position_visited = $spritemenu->visited;
+    if (!$postition_visited) {
+      $position_visited = $position_link;
+    }
+    $css_selectors = array();
+    foreach ($selectors as $selector) {
+      if ($selector) {
+        $selector .= ' ';
+      }
+      $css_selectors[] = "{$selector}a.spritemenu-{$spritemenu->mid}:visited";
+    }
+    $css .= implode($css_selectors, ",\n") . " {\n  text-indent: -9999px; \n  text-decoration: none; \n  width: 100%; \n  background: transparent url($img) no-repeat scroll $position_visited;\n}\n";
+
+    // Hover
+    $position_hover = $spritemenu->hover;
+    if (!$position_hover) {
+      $position_hover = $position_link;
+    }
+    $css_selectors = array();
+    foreach ($selectors as $selector) {
+      if ($selector) {
+        $selector .= ' ';
+      }
+      $css_selectors[] = "{$selector}a.spritemenu-{$spritemenu->mid}:hover";
+    }
+    $css .= implode($css_selectors, ",\n") . " {\n  text-indent: -9999px; \n  text-decoration: none; \n  width: 100%; \n  background: transparent url($img) no-repeat scroll $position_hover;\n}\n";
+
+    // Active
+    $position_active = $spritemenu->active;
+    if (!$position_active) {
+      $position_active = $position_link;
+    }
+    $css_selectors = array();
+    foreach ($selectors as $selector) {
+      if ($selector) {
+        $selector .= ' ';
+      }
+      $css_selectors[] = "{$selector}a.spritemenu-{$spritemenu->mid}.active";
+    }
+    $css .= implode($css_selectors, ",\n") . " {\n  text-indent: -9999px; \n  text-decoration: none; \n  width: 100%; \n  background: transparent url($img) no-repeat scroll $position_active;\n}\n";
+    fwrite($f, $css);
+  }
+  
+  if ($f) {
+    fclose($f);
+  }
+  else {
+    // remove empty css
+    file_delete($css);
+  }
+}
+
+/**
+ * Implementation of hook_init().
+ */
+function spritemenu_init() {
+  //_spritemenu_build_css();
+  $css = _spritemenu_css_filepath();
+  if (file_exists($css)) {
+    drupal_add_css($css);
+  }
+}
+
+function spritemenu_form_menu_edit_item_submit($form, &$form_state) {
+  $mid = $form_state['values']['menu']['mlid'];
+  $spritemenu = db_fetch_object(db_query("SELECT * FROM {spritemenu} WHERE mid = %d", $mid));
+
+  // Save file as a temporary one
+  $file = file_save_upload('spritemenu');
+  if ($file) {
+    // if OK, copy it to the module's directory
+    file_copy($file, _spritemenu_css_path());
+    $filepath = $file->filepath;
+  }
+  else {
+    $filepath = $spritemenu->filepath;
+  }
+  if ($file || $spritemenu && ($spritemenu->link != $form_state['values']['spritemenu']['link'] || $spritemenu->visited != $form_state['values']['spritemenu']['visited'] || $spritemenu->hover != $form_state['values']['spritemenu']['hover'] || $spritemenu->active != $form_state['values']['spritemenu']['active'])) {
+    if (!$spritemenu) {
+      db_query(
+        "INSERT INTO {spritemenu}
+        (mid, path, filepath, link, visited, hover, active)
+        VALUES (%d, '%s', '%s', '%s', '%s', '%s', '%s')",
+        $mid,
+        '',
+        //$form['#post']['path'] ? $form['#post']['path'] : $form['path']['#value'],
+        $filepath,
+        $form_state['values']['spritemenu']['link'],
+        $form_state['values']['spritemenu']['visited'],
+        $form_state['values']['spritemenu']['hover'],
+        $form_state['values']['spritemenu']['active']
+      );
+    }
+    else {
+      if ($file && $spritemenu->filepath && $spritemenu->filepath != $filepath) {
+        file_delete($spritemenu->filepath);
+      }
+      db_query(
+        "UPDATE {spritemenu} SET
+        path = '%s', filepath = '%s', link = '%s', visited = '%s', hover = '%s', active = '%s'
+        WHERE mid = %d",
+        '',
+        //$form['#post']['path'] ? $form['#post']['path'] : $form['path']['#value'],
+        $filepath,
+        $form_state['values']['spritemenu']['link'],
+        $form_state['values']['spritemenu']['visited'],
+        $form_state['values']['spritemenu']['hover'],
+        $form_state['values']['spritemenu']['active'],
+        $mid
+      );
+    }
+    $build = TRUE;
+  }
+  else {
+    // check if the user wants to remove the image
+    if ($form_state['values']['spritemenu']['image_remove']) {
+      db_query("DELETE FROM {spritemenu} WHERE mid = %d", $mid);
+      file_delete($spritemenu->filepath);
+      $build = TRUE;
+    }
+  }
+
+  if ($build) {
+    drupal_set_message(t('Sprite Graphic Menu: Information saved and CSS rebuilt. Please Ctrl+Refresh the page to reflect the changes.'));
+    _spritemenu_build_css();
+  }
+}
+
+function spritemenu_form_menu_reset_item_confirm_submit($form, &$form_state) {
+  $mid = $form_state['values']['item']['mlid'];
+  $spritemenu = db_fetch_object(db_query("SELECT * FROM {spritemenu} WHERE mid = %d", $mid));
+  if ($spritemenu->filepath) {
+    file_delete($spritemenu->filepath);
+  }
+  db_query("DELETE FROM {spritemenu} WHERE mid = %d", $mid);
+  drupal_set_message(t('Sprite Graphic Menu: Menu information deleted.'));
+  _spritemenu_build_css();
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function spritemenu_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id == 'menu_reset_item_confirm') {
+    // Add submit handler, make it the first one
+    $form['#submit'] = array_merge(array('spritemenu_form_menu_reset_item_confirm_submit'), $form['#submit']);
+  }
+
+  if ($form_id == 'menu_edit_item' && ($mid = $form['menu']['mlid']['#value'])) {
+    // Add submit handler, make it the first one
+    $form['#submit'] = array_merge(array('spritemenu_form_menu_edit_item_submit'), $form['#submit']);
+
+    // move submit to the end
+    $form['submit']['#weight'] = 2;
+
+    $form['#attributes'] = array('enctype' => 'multipart/form-data');
+
+    $spritemenu = db_fetch_object(db_query("SELECT * FROM {spritemenu} WHERE mid = %d", $mid));
+
+    $form['spritemenu'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Sprite Graphic Menu'),
+      '#collapsible' => FALSE,
+      //'#collapsed' => !($spritemenu),
+      //'#weight' => 1,
+      '#tree' => TRUE,
+    );
+
+    if ($spritemenu) {
+      $form['spritemenu']['image_display'] = array(
+        '#type' => 'markup',
+        '#value' => theme_image($spritemenu->filepath),
+       );
+      $form['spritemenu']['image_remove'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Remove'),
+        '#description' => t('Check this box and then submit to remove the image from disk and from this menu entry.'),
+       );
+    }
+
+    $form['spritemenu']['image'] = array(
+      '#type' => 'file',
+      '#title' => t('Image file'),
+     );
+
+    $form['spritemenu']['link'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Link'),
+      '#description' => t('Enter the CSS positioning corresponding to the sprite of the image you want to use.'),
+      '#default_value' => ($spritemenu->link ? $spritemenu->link : 'left top'),
+      '#required' => TRUE,
+     );
+    $form['spritemenu']['visited'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Visited'),
+      '#description' => t('Enter the CSS positioning corresponding to the sprite of the image you want to use.'),
+      '#default_value' => ($spritemenu->visited ? $spritemenu->visited: ''),
+     );
+    $form['spritemenu']['hover'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Hover'),
+      '#description' => t('Enter the CSS positioning corresponding to the sprite of the image you want to use.'),
+      '#default_value' => ($spritemenu->hover ? $spritemenu->hover: 'left bottom'),
+     );
+    $form['spritemenu']['active'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Active'),
+      '#description' => t('Enter the CSS positioning corresponding to the sprite of the image you want to use. This uses the active class of the link, not the CSS :active pseudo class.'),
+      '#default_value' => ($spritemenu->active ? $spritemenu->active: ''),
+     );
+  }
+
+  if ($form_id == 'menu_configure') {
+    $form['spritemenu'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Sprite Graphic Menu'),
+      '#weight' => 0,
+      '#collapsible' => TRUE,
+    );
+
+    $form['spritemenu']['spritemenu_path'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Directory'),
+      '#description' => t('A directory that will reside inside the files directory'),
+      '#default_value' => variable_get('spritemenu_path', 'spritemenu'),
+     );
+
+    $form['spritemenu']['spritemenu_extraselector'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Extra CSS link selectors'),
+      '#description' => t('<b>This is and advance setting and should be set by someone with CSS knowledge. It may break the dynamic CSS created by this module</b>. A comma separated list of CSS selectors to which a.spritemenu-MENUID will be appended. Useful if some links from your theme\' styles takes precedence over the ones defines by this module.'),
+      '#default_value' => variable_get('spritemenu_extraselector', SPRITEMENU_DEFAULT_EXTRACSS),
+     );
+  }
+}
+
+function spritemenu_menu_link_alter(&$item, $menu) {
+  $spritemenu = db_fetch_object(db_query("SELECT * FROM {spritemenu} WHERE mid = %d", $item['mlid']));
+  $match = preg_match("/spritemenu-([0-9]*)(\W|$)/", $item['options']['attributes']['class']);
+  if ($spritemenu) {
+    if ($match) {
+      $class = preg_replace("/spritemenu-([0-9]*)/", 'spritemenu-' . $item['mlid'], $item['options']['attributes']['class']);
+    }
+    else {
+      $class .= ' spritemenu-' . $item['mlid'];
+    }
+  }
+  // Remove the class if the spritemenu info was removed
+  else if ($match) {
+    $class = preg_replace("/spritemenu-([0-9]*)/", '', $item['options']['attributes']['class']);
+  }
+
+  if (!is_null($class)) {
+    if ($class == '' || $class == ' ') {
+      unset($item['options']['attributes']['class']);
+    }
+    else {
+      $item['options']['attributes']['class'] = $class;
+    }
+  }
+}
+
+function spritemenu_menu() {
+  $items = array();
+
+  $items['spritemenu/clean_orphaned'] = array (
+    'title' => 'Clean orphaned items',
+    'description' => 'Clean spritemenu orphaned menu items.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('spritemenu_clean_orphaned'),
+    'access arguments' => array('clean orphaned menu items'),
+    'type' => MENU_CALLBACK,
+  );
+  
+  return $items;
+}
+
+function spritemenu_perm() {
+  return array('clean orphaned menu items');
+}
+
+function spritemenu_clean_orphaned_submit($form, &$form_state) {
+  $result = db_query("SELECT s.* FROM {spritemenu} s LEFT JOIN {menu_links} ml ON s.mid = ml.mlid WHERE isnull(ml.mlid)");
+
+  while ($spritemenu = db_fetch_object($result)) {
+    if ($spritemenu->filepath) {
+      file_delete($spritemenu->filepath);
+    }
+    db_query("DELETE FROM {spritemenu} WHERE mid = %d", $spritemenu->mid);
+  }
+
+  drupal_set_message(t('Sprite Graphic Menu: Orphaned menu items cleaned and CSS rebuilt. Please Ctrl+Refresh the page to reflect the changes.'));
+  _spritemenu_build_css();
+
+  $form_state['redirect'] = 'admin/reports/status';
+}
+
+function spritemenu_clean_orphaned() {
+  return confirm_form($form, t('Are you sure you want to clean the spritemenu orphaned items?'), 'admin/reports/status');
+}
